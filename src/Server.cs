@@ -37,7 +37,7 @@ try
 
         var result = socket.Send(encodedResponse);
 
-        if (result == encodedResponse.Length) Console.WriteLine("Response sent successfully");
+        if (result == encodedResponse.Length) Console.WriteLine($"Response sent successfully: {responseMessage}");
 
         socket.Close();
     }
