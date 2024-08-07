@@ -26,14 +26,18 @@ public class IncomingHttpRequest
         
         var beginningOfHeaders = requestString.IndexOf(Constants.ClrfSeparator, StringComparison.Ordinal) + Constants.ClrfSeparator.Length;
         var endOfHeaders = requestString.IndexOf(Constants.ClrfSeparator+Constants.ClrfSeparator, StringComparison.Ordinal);
-        var headers = requestString[beginningOfHeaders..endOfHeaders].Split(Constants.ClrfSeparator);
 
-        foreach (var header in headers)
+        if (endOfHeaders > beginningOfHeaders)
         {
-            var headerNameEndPosition = header.IndexOf(':');
-            var headerName = header[..headerNameEndPosition];
-            var headerValue = header[(headerNameEndPosition + 1)..];
-            incomingHttpRequest.Headers[headerName] = headerValue.Trim();
+            var headers = requestString[beginningOfHeaders..endOfHeaders].Split(Constants.ClrfSeparator);
+
+            foreach (var header in headers)
+            {
+                var headerNameEndPosition = header.IndexOf(':');
+                var headerName = header[..headerNameEndPosition];
+                var headerValue = header[(headerNameEndPosition + 1)..];
+                incomingHttpRequest.Headers[headerName] = headerValue.Trim();
+            }
         }
         
         return incomingHttpRequest;
