@@ -33,40 +33,8 @@ try
 
             Console.WriteLine($"Received request: {receivedMessage}");
 
-            var incomingHttpRequest = IncomingHttpRequest.Parse(receivedMessage);
-
-            string responseMessage;
-
-            switch (incomingHttpRequest)
-            {
-                case { Target: "/" }:
-                    responseMessage = $"HTTP/1.1 200 OK{Constants.ClrfSeparator}{Constants.ClrfSeparator}";
-                    break;
-                case { Target: "/user-agent" }:
-                {
-                    incomingHttpRequest.Headers.TryGetValue(Constants.UserAgentHeaderName, out var userAgent);
-                    responseMessage =
-                        $"HTTP/1.1 200 OK{Constants.ClrfSeparator}Content-Type: text/plain{Constants.ClrfSeparator}Content-Length: {userAgent?.Length}{Constants.ClrfSeparator}{Constants.ClrfSeparator}{userAgent}";
-                    break;
-                }
-                default:
-                {
-                    if (incomingHttpRequest.Target.StartsWith("/echo/"))
-                    {
-                        var endpointParameter = incomingHttpRequest.Target.Split('/')[2];
-                        responseMessage =
-                            $"HTTP/1.1 200 OK{Constants.ClrfSeparator}Content-Type: text/plain{Constants.ClrfSeparator}Content-Length: {endpointParameter.Length}{Constants.ClrfSeparator}{Constants.ClrfSeparator}{endpointParameter}";
-                    }
-                    else
-                    {
-                        responseMessage = $"HTTP/1.1 404 Not Found{Constants.ClrfSeparator}{Constants.ClrfSeparator}";
-                    }
-
-                    break;
-                }
-            }
-
-
+            var responseMessage = HandleRequest(receivedMessage);
+            
             var encodedResponse = Encoding.UTF8.GetBytes(responseMessage);
 
             var result = socket.Send(encodedResponse);
@@ -84,6 +52,54 @@ catch (Exception e)
 finally
 {
     server.Stop();
+}
+
+string HandleRequest(string s)
+{
+    var incomingHttpRequest = IncomingHttpRequest.Parse(s);
+    
+    switch (incomingHttpRequest)
+    {
+        case { Target: "/" }:
+            return $"HTTP/1.1 200 OK{Constants.ClrfSeparator}{Constants.ClrfSeparator}";
+        case { Target: "/user-agent" }:
+        {
+            incomingHttpRequest.Headers.TryGetValue(Constants.UserAgentHeaderName, out var userAgent);
+            return 
+                $"HTTP/1.1 200 OK{Constants.ClrfSeparator}Content-Type: text/plain{Constants.ClrfSeparator}Content-Length: {userAgent?.Length}{Constants.ClrfSeparator}{Constants.ClrfSeparator}{userAgent}";
+        }
+                
+        default:
+        {
+            if (incomingHttpRequest.Target.StartsWith("/echo/"))
+            {
+                var endpointParameter = incomingHttpRequest.Target.Split('/')[2];
+                return 
+                    $"HTTP/1.1 200 OK{Constants.ClrfSeparator}Content-Type: text/plain{Constants.ClrfSeparator}Content-Length: {endpointParameter.Length}{Constants.ClrfSeparator}{Constants.ClrfSeparator}{endpointParameter}";
+            }
+            else if(incomingHttpRequest.Target.StartsWith("/files/"))
+            {
+                var directory = args[1];
+                Console.WriteLine("The director is: " + directory);
+
+                var fileName = incomingHttpRequest.Target.Split('/')[2];
+                var filePath = $"{directory}{fileName}";
+                
+                Console.WriteLine("The full path is: " + filePath);
+                
+                if(File.Exists(filePath))
+                {
+                    var contentBytes = File.ReadAllBytes(filePath);
+                    var content = Encoding.UTF8.GetString(contentBytes);
+                     return 
+                        $"HTTP/1.1 200 OK{Constants.ClrfSeparator}Content-Type: application/octet-stream{Constants.ClrfSeparator}Content-Length: {contentBytes.Length}{Constants.ClrfSeparator}{Constants.ClrfSeparator}{content}";
+                }
+            }
+            
+            return $"HTTP/1.1 404 Not Found{Constants.ClrfSeparator}{Constants.ClrfSeparator}";
+            
+        }
+    }
 }
 
 
