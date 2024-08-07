@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
+using pmn_http_server;
 
 // You can use print statements as follows for debugging, they'll be visible when running tests.
 Console.WriteLine("Logs from your program will appear here!");
@@ -29,7 +30,9 @@ try
         
         Console.WriteLine($"Received request: {receivedMessage}");
 
-        var requestTarget = ParseRequestTarget(receivedMessage);
+        var incomingHttpRequest = ParseRequestTarget(receivedMessage);
+
+        string responseMessage;
 
         var responseMessage = requestTarget == "/" ? "HTTP/1.1 200 OK\r\n\r\n" : "HTTP/1.1 404 Not Found\r\n\r\n";
         
@@ -51,14 +54,21 @@ finally
     server.Stop();
 }
 
-string? ParseRequestTarget(string s)
+IncomingHttpRequest ParseRequestTarget(string requestString)
 {
-    var endOfRequestLineIndex = s.IndexOf("\r\n", StringComparison.Ordinal);
+    var requestParts = requestString.Split("\r\n");
 
-    if (endOfRequestLineIndex == -1) return null;
 
-    var requestLine = s[..endOfRequestLineIndex];
+    var requestLine = requestParts.FirstOrDefault();
+    //var requestBody = requestParts.LastOrDefault();
+    
 
-    var requestTarget1 = requestLine.Split(' ')[1];
-    return requestTarget1;
+    var requestLineParts = requestLine?.Split(' ');
+
+    return new IncomingHttpRequest
+    {
+        HttpMethod = requestLineParts?[0],
+        Target = requestLineParts?[1],
+        HttpVersion = requestLineParts?[2],
+    };
 }
