@@ -39,6 +39,8 @@ public class IncomingHttpRequest
                 incomingHttpRequest.Headers[headerName] = headerValue.Trim();
             }
         }
+
+        incomingHttpRequest.Body = requestString[(endOfHeaders + Constants.ClrfSeparator.Length*2)..];
         
         return incomingHttpRequest;
     }

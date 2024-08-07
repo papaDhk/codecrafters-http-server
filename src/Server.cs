@@ -75,24 +75,39 @@ string HandleRequest(string s)
             {
                 var endpointParameter = incomingHttpRequest.Target.Split('/')[2];
                 return 
-                    $"HTTP/1.1 200 OK{Constants.ClrfSeparator}Content-Type: text/plain{Constants.ClrfSeparator}Content-Length: {endpointParameter.Length}{Constants.ClrfSeparator}{Constants.ClrfSeparator}{endpointParameter}";
+                    $"HTTP/1.1 200 OK{Constants.ClrfSeparator}" +
+                    $"Content-Type: text/plain{Constants.ClrfSeparator}" +
+                    $"Content-Length: {endpointParameter.Length}{Constants.ClrfSeparator}" +
+                    $"{Constants.ClrfSeparator}{endpointParameter}";
             }
-            else if(incomingHttpRequest.Target.StartsWith("/files/"))
+
+            if(incomingHttpRequest.Target.StartsWith("/files/"))
             {
-                var directory = args[1];
+                var directory = args.Length >= 2 ? args[1] : string.Empty;
                 Console.WriteLine("The director is: " + directory);
 
                 var fileName = incomingHttpRequest.Target.Split('/')[2];
                 var filePath = $"{directory}{fileName}";
                 
                 Console.WriteLine("The full path is: " + filePath);
-                
-                if(File.Exists(filePath))
+
+                switch (incomingHttpRequest.HttpMethod)
                 {
-                    var contentBytes = File.ReadAllBytes(filePath);
-                    var content = Encoding.UTF8.GetString(contentBytes);
-                     return 
-                        $"HTTP/1.1 200 OK{Constants.ClrfSeparator}Content-Type: application/octet-stream{Constants.ClrfSeparator}Content-Length: {contentBytes.Length}{Constants.ClrfSeparator}{Constants.ClrfSeparator}{content}";
+                    case Constants.HttpGetMethod when File.Exists(filePath):
+                    {
+                        var contentBytes = File.ReadAllBytes(filePath);
+                        var content = Encoding.UTF8.GetString(contentBytes);
+                        return $"HTTP/1.1 200 OK{Constants.ClrfSeparator}Content-Type: application/octet-stream" +
+                               $"{Constants.ClrfSeparator}Content-Length: {contentBytes.Length}" +
+                               $"{Constants.ClrfSeparator}{Constants.ClrfSeparator}" +
+                               $"{content}";
+                    }
+                    case Constants.HttpPostMethod:
+                        using (var streamWriter = File.CreateText(filePath))
+                        {
+                            streamWriter.Write(incomingHttpRequest.Body);
+                        }
+                        return $"HTTP/1.1 201 Created{Constants.ClrfSeparator}{Constants.ClrfSeparator}";
                 }
             }
             
