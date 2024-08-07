@@ -30,25 +30,31 @@ try
         
         Console.WriteLine($"Received request: {receivedMessage}");
 
-        var incomingHttpRequest = ParseRequestTarget(receivedMessage);
+        var incomingHttpRequest = IncomingHttpRequest.Parse(receivedMessage);
 
         string responseMessage;
 
         switch (incomingHttpRequest)
         {
             case { Target: "/" }:
-                responseMessage = "HTTP/1.1 200 OK\r\n\r\n";
+                responseMessage = $"HTTP/1.1 200 OK{Constants.ClrfSeparator}{Constants.ClrfSeparator}";
                 break;
+            case { Target: "/user-agent" }:
+            {
+                incomingHttpRequest.Headers.TryGetValue(Constants.UserAgentHeaderName, out var userAgent);
+                responseMessage = $"HTTP/1.1 200 OK{Constants.ClrfSeparator}Content-Type: text/plain{Constants.ClrfSeparator}Content-Length: {userAgent?.Length}{Constants.ClrfSeparator}{Constants.ClrfSeparator}{userAgent}";
+                break;   
+            }
             default:
             {
                 if (incomingHttpRequest.Target.StartsWith("/echo/"))
                 {
                     var endpointParameter = incomingHttpRequest.Target.Split('/')[2];
-                    responseMessage = $"HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: {endpointParameter.Length}\r\n\r\n{endpointParameter}";
+                    responseMessage = $"HTTP/1.1 200 OK{Constants.ClrfSeparator}Content-Type: text/plain{Constants.ClrfSeparator}Content-Length: {endpointParameter.Length}{Constants.ClrfSeparator}{Constants.ClrfSeparator}{endpointParameter}";
                 }
                 else
                 {
-                    responseMessage = "HTTP/1.1 404 Not Found\r\n\r\n";
+                    responseMessage = $"HTTP/1.1 404 Not Found{Constants.ClrfSeparator}{Constants.ClrfSeparator}";
                 }
 
                 break;
@@ -74,21 +80,4 @@ finally
     server.Stop();
 }
 
-IncomingHttpRequest ParseRequestTarget(string requestString)
-{
-    var requestParts = requestString.Split("\r\n");
 
-
-    var requestLine = requestParts.FirstOrDefault();
-    //var requestBody = requestParts.LastOrDefault();
-    
-
-    var requestLineParts = requestLine?.Split(' ');
-
-    return new IncomingHttpRequest
-    {
-        HttpMethod = requestLineParts?[0],
-        Target = requestLineParts?[1],
-        HttpVersion = requestLineParts?[2],
-    };
-}
