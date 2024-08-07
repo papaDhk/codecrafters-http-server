@@ -31,7 +31,7 @@ try
 
         var requestTarget = ParseRequestTarget(receivedMessage);
 
-        var responseMessage = requestTarget == "/" ? "HTTP/1.1 200 OK\r\n\r\n" : "HTTP/1.1 404 NotFound\r\n\r\n";
+        var responseMessage = requestTarget == "/" ? "HTTP/1.1 200 OK\r\n\r\n" : "HTTP/1.1 404 Not Found\r\n\r\n";
         
         var encodedResponse = Encoding.UTF8.GetBytes(responseMessage);
 
