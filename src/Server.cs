@@ -20,55 +20,61 @@ try
         //and the returned socket allows us to communicate with the client
         var socket = server.AcceptSocket();
 
-        Console.WriteLine($"Connection established with a client");
-
-        var readBuffer = new byte[1024];
-        
-        var receivedBufferSize = socket.Receive(readBuffer, SocketFlags.None);
-
-        var receivedMessage = Encoding.UTF8.GetString(readBuffer, 0, receivedBufferSize);
-        
-        Console.WriteLine($"Received request: {receivedMessage}");
-
-        var incomingHttpRequest = IncomingHttpRequest.Parse(receivedMessage);
-
-        string responseMessage;
-
-        switch (incomingHttpRequest)
+        //This handle the request concurrently
+        Task.Run(() =>
         {
-            case { Target: "/" }:
-                responseMessage = $"HTTP/1.1 200 OK{Constants.ClrfSeparator}{Constants.ClrfSeparator}";
-                break;
-            case { Target: "/user-agent" }:
+            Console.WriteLine($"Connection established with a client");
+
+            var readBuffer = new byte[1024];
+
+            var receivedBufferSize = socket.Receive(readBuffer, SocketFlags.None);
+
+            var receivedMessage = Encoding.UTF8.GetString(readBuffer, 0, receivedBufferSize);
+
+            Console.WriteLine($"Received request: {receivedMessage}");
+
+            var incomingHttpRequest = IncomingHttpRequest.Parse(receivedMessage);
+
+            string responseMessage;
+
+            switch (incomingHttpRequest)
             {
-                incomingHttpRequest.Headers.TryGetValue(Constants.UserAgentHeaderName, out var userAgent);
-                responseMessage = $"HTTP/1.1 200 OK{Constants.ClrfSeparator}Content-Type: text/plain{Constants.ClrfSeparator}Content-Length: {userAgent?.Length}{Constants.ClrfSeparator}{Constants.ClrfSeparator}{userAgent}";
-                break;   
-            }
-            default:
-            {
-                if (incomingHttpRequest.Target.StartsWith("/echo/"))
+                case { Target: "/" }:
+                    responseMessage = $"HTTP/1.1 200 OK{Constants.ClrfSeparator}{Constants.ClrfSeparator}";
+                    break;
+                case { Target: "/user-agent" }:
                 {
-                    var endpointParameter = incomingHttpRequest.Target.Split('/')[2];
-                    responseMessage = $"HTTP/1.1 200 OK{Constants.ClrfSeparator}Content-Type: text/plain{Constants.ClrfSeparator}Content-Length: {endpointParameter.Length}{Constants.ClrfSeparator}{Constants.ClrfSeparator}{endpointParameter}";
+                    incomingHttpRequest.Headers.TryGetValue(Constants.UserAgentHeaderName, out var userAgent);
+                    responseMessage =
+                        $"HTTP/1.1 200 OK{Constants.ClrfSeparator}Content-Type: text/plain{Constants.ClrfSeparator}Content-Length: {userAgent?.Length}{Constants.ClrfSeparator}{Constants.ClrfSeparator}{userAgent}";
+                    break;
                 }
-                else
+                default:
                 {
-                    responseMessage = $"HTTP/1.1 404 Not Found{Constants.ClrfSeparator}{Constants.ClrfSeparator}";
+                    if (incomingHttpRequest.Target.StartsWith("/echo/"))
+                    {
+                        var endpointParameter = incomingHttpRequest.Target.Split('/')[2];
+                        responseMessage =
+                            $"HTTP/1.1 200 OK{Constants.ClrfSeparator}Content-Type: text/plain{Constants.ClrfSeparator}Content-Length: {endpointParameter.Length}{Constants.ClrfSeparator}{Constants.ClrfSeparator}{endpointParameter}";
+                    }
+                    else
+                    {
+                        responseMessage = $"HTTP/1.1 404 Not Found{Constants.ClrfSeparator}{Constants.ClrfSeparator}";
+                    }
+
+                    break;
                 }
-
-                break;
             }
-        }
-        
-        
-        var encodedResponse = Encoding.UTF8.GetBytes(responseMessage);
 
-        var result = socket.Send(encodedResponse);
 
-        if (result == encodedResponse.Length) Console.WriteLine($"Response sent successfully: {responseMessage}");
+            var encodedResponse = Encoding.UTF8.GetBytes(responseMessage);
 
-        socket.Close();
+            var result = socket.Send(encodedResponse);
+
+            if (result == encodedResponse.Length) Console.WriteLine($"Response sent successfully: {responseMessage}");
+
+            socket.Close();
+        });
     }
 }
 catch (Exception e)
