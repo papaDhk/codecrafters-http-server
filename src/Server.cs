@@ -34,7 +34,27 @@ try
 
         string responseMessage;
 
-        var responseMessage = requestTarget == "/" ? "HTTP/1.1 200 OK\r\n\r\n" : "HTTP/1.1 404 Not Found\r\n\r\n";
+        switch (incomingHttpRequest)
+        {
+            case { Target: "/" }:
+                responseMessage = "HTTP/1.1 200 OK\r\n\r\n";
+                break;
+            default:
+            {
+                if (incomingHttpRequest.Target.StartsWith("/echo/"))
+                {
+                    var endpointParameter = incomingHttpRequest.Target.Split('/')[2];
+                    responseMessage = $"HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: {endpointParameter.Length}\r\n\r\n{endpointParameter}";
+                }
+                else
+                {
+                    responseMessage = "HTTP/1.1 404 Not Found\r\n\r\n";
+                }
+
+                break;
+            }
+        }
+        
         
         var encodedResponse = Encoding.UTF8.GetBytes(responseMessage);
 
