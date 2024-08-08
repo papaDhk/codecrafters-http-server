@@ -1,16 +1,18 @@
 using System.Net;
 using System.Net.Sockets;
+using System.Security.AccessControl;
 using System.Text;
 using pmn_http_server;
 
 // You can use print statements as follows for debugging, they'll be visible when running tests.
 Console.WriteLine("Logs from your program will appear here!");
+HashSet<CompressionType> SupportedCompressions = [CompressionType.gzip, CompressionType.deflate];
 
 var server = new TcpListener(IPAddress.Any, 4221);
 
 try
 {
-    //At this point the server start listenning for connections and add them in a dedicated queue
+    //At this point the server start listening for connections and add them in a dedicated queue
     server.Start();
 
     //Loop for handling connections
@@ -56,27 +58,33 @@ finally
     server.Stop();
 }
 
-HttpResponse HandleRequest(string s)
-{
-    var incomingHttpRequest = IncomingHttpRequest.Parse(s);
+return;
 
+HttpResponse HandleRequest(string requestMessage)
+{
+    var incomingHttpRequest = IncomingHttpRequest.Parse(requestMessage);
+
+    Enum.TryParse(incomingHttpRequest.AcceptEncodings.Intersect(SupportedCompressions.Select(c => c.ToString()))
+                                .FirstOrDefault(), out CompressionType compressionType);
     var response = new HttpResponse
     {
-        HttpVersion = incomingHttpRequest.HttpVersion
+        HttpVersion = incomingHttpRequest.HttpVersion,
+        CompressionType = compressionType
     };
+    
     
     switch (incomingHttpRequest)
     {
         case { Target: "/" }:
-            response.HttpStatus = HttpStatus.Ok;
+            response.HttpStatus = HttpStatus.OK;
+            TryCompressResponseBody(response, compressionType, string.Empty);
             return response;
         case { Target: "/user-agent" }:
         {
             incomingHttpRequest.Headers.TryGetValue(Constants.UserAgentHeaderName, out var userAgent);
-            response.HttpStatus = HttpStatus.Ok;
+            response.HttpStatus = HttpStatus.OK;
             response.Headers.TryAdd("Content-Type", "text/plain");
-            response.Headers.TryAdd("Content-Length", $"{userAgent?.Length}");
-            response.Body = userAgent;
+            TryCompressResponseBody(response, compressionType, userAgent);
             return response;
         }
                 
@@ -85,10 +93,9 @@ HttpResponse HandleRequest(string s)
             if (incomingHttpRequest.Target.StartsWith("/echo/"))
             {
                 var endpointParameter = incomingHttpRequest.Target.Split('/')[2];
-                response.HttpStatus = HttpStatus.Ok;
+                response.HttpStatus = HttpStatus.OK;
                 response.Headers.TryAdd("Content-Type", "text/plain");
-                response.Headers.TryAdd("Content-Length", $"{endpointParameter.Length}");
-                response.Body = endpointParameter;
+                TryCompressResponseBody(response, compressionType, endpointParameter);
                 return response;
             }
 
@@ -108,13 +115,13 @@ HttpResponse HandleRequest(string s)
                     {
                         var contentBytes = File.ReadAllBytes(filePath);
                         var content = Encoding.UTF8.GetString(contentBytes);
-                        response.HttpStatus = HttpStatus.Ok;
+                        response.HttpStatus = HttpStatus.OK;
                         response.Headers.TryAdd("Content-Type", "application/octet-stream");
-                        response.Headers.TryAdd("Content-Length", $"{contentBytes.Length}");
-                        response.Body = content;
+                        TryCompressResponseBody(response, compressionType, content);
                         return response;
                     }
                     case Constants.HttpPostMethod:
+                    {
                         using (var streamWriter = File.CreateText(filePath))
                         {
                             streamWriter.Write(incomingHttpRequest.Body);
@@ -122,6 +129,7 @@ HttpResponse HandleRequest(string s)
                         
                         response.HttpStatus = HttpStatus.Created;
                         return response;
+                    }
                 }
             }
             
@@ -130,5 +138,24 @@ HttpResponse HandleRequest(string s)
         }
     }
 }
+
+void TryCompressResponseBody(HttpResponse response, CompressionType compressionType, string responseBody)
+{
+    if (compressionType != CompressionType.none)
+    {
+        response.Headers.TryAdd(Constants.ContentEncodingHeaderName, compressionType.ToString());
+        response.Body = responseBody;
+        response.Headers.TryAdd("Content-Length", $"{responseBody.Length}");
+        response.Body = responseBody;
+    }
+    else
+    {
+        response.Headers.TryAdd("Content-Length", $"{responseBody.Length}");
+        response.Body = responseBody;
+    }
+}
+
+
+
 
 

@@ -7,6 +7,7 @@ public class IncomingHttpRequest
     public string Target { get; set; }
     public string HttpVersion { get; set; }
     public string Body { get; set; }
+    public string[] AcceptEncodings { get; set; } = [];
     
     public static IncomingHttpRequest Parse(string requestString)
     {
@@ -39,6 +40,10 @@ public class IncomingHttpRequest
                 incomingHttpRequest.Headers[headerName] = headerValue.Trim();
             }
         }
+
+        if (incomingHttpRequest.Headers.TryGetValue(Constants.AcceptEncodingHeaderName, out var acceptEncodingHeader)
+            && !string.IsNullOrWhiteSpace(acceptEncodingHeader))
+            incomingHttpRequest.AcceptEncodings = acceptEncodingHeader.Split(',', StringSplitOptions.TrimEntries);
 
         incomingHttpRequest.Body = requestString[(endOfHeaders + Constants.ClrfSeparator.Length*2)..];
         
