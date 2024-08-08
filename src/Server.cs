@@ -35,12 +35,14 @@ try
 
             var responseMessage = HandleRequest(receivedMessage);
             
-            var encodedResponse = Encoding.UTF8.GetBytes(responseMessage);
+            var encodedResponse = Encoding.UTF8.GetBytes(responseMessage.ToString());
 
             var result = socket.Send(encodedResponse);
 
             if (result == encodedResponse.Length) Console.WriteLine($"Response sent successfully: {responseMessage}");
-
+            
+            Array.Clear(readBuffer);
+            
             socket.Close();
         });
     }
@@ -54,19 +56,28 @@ finally
     server.Stop();
 }
 
-string HandleRequest(string s)
+HttpResponse HandleRequest(string s)
 {
     var incomingHttpRequest = IncomingHttpRequest.Parse(s);
+
+    var response = new HttpResponse
+    {
+        HttpVersion = incomingHttpRequest.HttpVersion
+    };
     
     switch (incomingHttpRequest)
     {
         case { Target: "/" }:
-            return $"HTTP/1.1 200 OK{Constants.ClrfSeparator}{Constants.ClrfSeparator}";
+            response.HttpStatus = HttpStatus.Ok;
+            return response;
         case { Target: "/user-agent" }:
         {
             incomingHttpRequest.Headers.TryGetValue(Constants.UserAgentHeaderName, out var userAgent);
-            return 
-                $"HTTP/1.1 200 OK{Constants.ClrfSeparator}Content-Type: text/plain{Constants.ClrfSeparator}Content-Length: {userAgent?.Length}{Constants.ClrfSeparator}{Constants.ClrfSeparator}{userAgent}";
+            response.HttpStatus = HttpStatus.Ok;
+            response.Headers.TryAdd("Content-Type", "text/plain");
+            response.Headers.TryAdd("Content-Length", $"{userAgent?.Length}");
+            response.Body = userAgent;
+            return response;
         }
                 
         default:
@@ -74,11 +85,11 @@ string HandleRequest(string s)
             if (incomingHttpRequest.Target.StartsWith("/echo/"))
             {
                 var endpointParameter = incomingHttpRequest.Target.Split('/')[2];
-                return 
-                    $"HTTP/1.1 200 OK{Constants.ClrfSeparator}" +
-                    $"Content-Type: text/plain{Constants.ClrfSeparator}" +
-                    $"Content-Length: {endpointParameter.Length}{Constants.ClrfSeparator}" +
-                    $"{Constants.ClrfSeparator}{endpointParameter}";
+                response.HttpStatus = HttpStatus.Ok;
+                response.Headers.TryAdd("Content-Type", "text/plain");
+                response.Headers.TryAdd("Content-Length", $"{endpointParameter.Length}");
+                response.Body = endpointParameter;
+                return response;
             }
 
             if(incomingHttpRequest.Target.StartsWith("/files/"))
@@ -97,22 +108,25 @@ string HandleRequest(string s)
                     {
                         var contentBytes = File.ReadAllBytes(filePath);
                         var content = Encoding.UTF8.GetString(contentBytes);
-                        return $"HTTP/1.1 200 OK{Constants.ClrfSeparator}Content-Type: application/octet-stream" +
-                               $"{Constants.ClrfSeparator}Content-Length: {contentBytes.Length}" +
-                               $"{Constants.ClrfSeparator}{Constants.ClrfSeparator}" +
-                               $"{content}";
+                        response.HttpStatus = HttpStatus.Ok;
+                        response.Headers.TryAdd("Content-Type", "application/octet-stream");
+                        response.Headers.TryAdd("Content-Length", $"{contentBytes.Length}");
+                        response.Body = content;
+                        return response;
                     }
                     case Constants.HttpPostMethod:
                         using (var streamWriter = File.CreateText(filePath))
                         {
                             streamWriter.Write(incomingHttpRequest.Body);
                         }
-                        return $"HTTP/1.1 201 Created{Constants.ClrfSeparator}{Constants.ClrfSeparator}";
+                        
+                        response.HttpStatus = HttpStatus.Created;
+                        return response;
                 }
             }
             
-            return $"HTTP/1.1 404 Not Found{Constants.ClrfSeparator}{Constants.ClrfSeparator}";
-            
+            response.HttpStatus = HttpStatus.NotFound;
+            return response;
         }
     }
 }
