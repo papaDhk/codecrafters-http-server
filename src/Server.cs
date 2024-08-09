@@ -1,3 +1,4 @@
+using System.IO.Compression;
 using System.Net;
 using System.Net.Sockets;
 using System.Security.AccessControl;
@@ -37,11 +38,10 @@ try
 
             var responseMessage = HandleRequest(receivedMessage);
             
-            var encodedResponse = Encoding.UTF8.GetBytes(responseMessage.ToString());
 
-            var result = socket.Send(encodedResponse);
+            var result = socket.Send(responseMessage.ToBytes());
 
-            if (result == encodedResponse.Length) Console.WriteLine($"Response sent successfully: {responseMessage}");
+            if (result > 0) Console.WriteLine($"Response sent successfully: {responseMessage}");
             
             Array.Clear(readBuffer);
             
@@ -83,7 +83,6 @@ HttpResponse HandleRequest(string requestMessage)
         {
             incomingHttpRequest.Headers.TryGetValue(Constants.UserAgentHeaderName, out var userAgent);
             response.HttpStatus = HttpStatus.OK;
-            response.Headers.TryAdd("Content-Type", "text/plain");
             TryCompressResponseBody(response, compressionType, userAgent);
             return response;
         }
@@ -94,7 +93,6 @@ HttpResponse HandleRequest(string requestMessage)
             {
                 var endpointParameter = incomingHttpRequest.Target.Split('/')[2];
                 response.HttpStatus = HttpStatus.OK;
-                response.Headers.TryAdd("Content-Type", "text/plain");
                 TryCompressResponseBody(response, compressionType, endpointParameter);
                 return response;
             }
@@ -143,15 +141,21 @@ void TryCompressResponseBody(HttpResponse response, CompressionType compressionT
 {
     if (compressionType != CompressionType.none)
     {
+        using var compressedStream = new MemoryStream();
+        var responseBodyBytes = Encoding.UTF8.GetBytes(responseBody);
+        using var gZipStream = new GZipStream(compressedStream, CompressionMode.Compress);
+        gZipStream.Write(responseBodyBytes);
+        gZipStream.Close();
+        response.Body = compressedStream.ToArray();
+        response.Headers.TryAdd("Content-Type", "text/plain");
         response.Headers.TryAdd(Constants.ContentEncodingHeaderName, compressionType.ToString());
-        response.Body = responseBody;
-        response.Headers.TryAdd("Content-Length", $"{responseBody.Length}");
-        response.Body = responseBody;
+        response.Headers.TryAdd("Content-Length", $"{response.Body.Length}");
     }
     else
     {
+        response.Headers.TryAdd("Content-Type", "text/plain");
         response.Headers.TryAdd("Content-Length", $"{responseBody.Length}");
-        response.Body = responseBody;
+        response.Body = Encoding.UTF8.GetBytes(responseBody);
     }
 }
 
